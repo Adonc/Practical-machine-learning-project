@@ -1,0 +1,133 @@
+---
+title: "Coursera Practical Machine Learning Project"
+author: "Adon Chawe"
+date: "December 23, 2018"
+output: html_document
+---
+##Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+##Data
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment. 
+
+##Goal
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases. 
+
+##Loading and Cleaning Data
+```{r}
+#loading libraries
+library(caret)
+library(randomForest)
+library(rpart)
+library(e1071)
+library(rpart.plot)
+
+#this is a testing set that will be used for final testing of the model will select
+testing<-read.csv("pml-testing.csv",na.string=c("NA","#DIV/0!", ""))
+#Will use this for cross-validation, by subsetting into sub_traing and sub_testing respectively
+training<-read.csv("pml-training.csv",na.string=c("NA","#DIV/0!", ""))
+set.seed(124)
+Intrain<-createDataPartition(training$classe,p=.75)[[1]]
+sub_training<-training[Intrain,]
+sub_testing<-training[-Intrain,]
+sub_training<-sub_training[,colSums(is.na(sub_training)) == 0]
+sub_testing<-sub_testing[,colSums(is.na(sub_testing)) == 0]
+
+#removing the first 7 variables as they have nothing todo with predictions
+sub_training<-sub_training[,-c(1:7)]
+sub_testing<-sub_testing[,-c(1:7)]
+```
+
+## Expected out-of-sample error
+The expected out-of-sample error has to be really low and it will be obtained using: 1-accuracy in my 25% sub_testing data. Accuracy is the proportion of correct classified observation over the total sample in the subTesting data set. Expected accuracy is the expected accuracy in the out-of-sample data set (i.e. original testing data set). Thus, the expected value of the out-of-sample error will correspond to the expected number of missclassified observations/total observations in the Test data set, which is the quantity: 1-accuracy found from the cross-validation data set.
+
+## Exploratory Data analysis
+
+```{r}
+
+qplot(sub_training$classe, main="Levels of the variable classe", xlab="levels", ylab="Frequency")
+
+```
+
+The plot above shows that Level A is the most frequent classe. D appears to be the least frequent one.
+
+## Prediction models
+I will first build a decision tree, this model usually offer high interpretability and decent accuracy; then, we will build random forests,where there is often a gain in accuracy, at the expense of interpretability.
+
+### Decision tree
+
+```{r}
+##for Reproducibility
+set.seed(124)
+#fit a decision tree
+model_1_decisionT <- rpart(classe ~ ., data=sub_training, method="class")
+```
+# Prediction from Using Decision tress
+```{r}
+predict_decisionT <- predict(model_1_decisionT , sub_testing, type = "class")
+```
+# Plot result of decision
+```{r}
+## plotting decision tree using library(rpart.plot)
+prp(model_1_decisionT)
+```
+
+A confusionMatrix function gives us the perfomance of our model on the validation data (Sub_testing). both the estimated accuracy and the the estimated out-of-sample error of the model are calculated.
+
+```{r} 
+confusionMatrix(predict_decisionT, sub_testing$classe) 
+``` 
+
+The out of sample error for Decision tree is:
+```{r}
+Out_of_sample_error <- 1 - as.numeric(confusionMatrix(sub_testing$classe, predict_decisionT)$overall[1])
+#show the Error
+Out_of_sample_error
+```
+
+### Random forest
+
+```{r}
+##for Reproducibility
+set.seed(126) 
+
+# Fittin a Random Forest model
+model_random_forest<-randomForest(classe ~ ., data=sub_training, method="class")
+#predict using Random forest
+predict_randomF <- predict(model_random_forest, sub_testing, type = "class")
+```
+
+Following confusion matrix shows the errors of the prediction algorithm.
+
+```{r}
+confusionMatrix(predict_randomF, sub_testing$classe)
+```
+The out of sample error for Random is:
+```{r}
+Out_of_sample_error <- 1 - as.numeric(confusionMatrix(predict_randomF,sub_testing$classe )$overall[1])
+#show the Error
+Out_of_sample_error
+```
+
+##Conclusion
+
+###Results
+As can be drawn from the two model's accuracies and Out of sample error, Random Forests outbeats decision trees in terms of perfomance with an Accuracy of 0.9953, therefore will settle for Random Forests model for my final presention and predicting on the given test data.
+
+
+```{r submission, echo=TRUE} 
+# Predict on testing data
+final_result<-predict(model_random_forest,testing,type="class")
+final_result
+```
+
+
